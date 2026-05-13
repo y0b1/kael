@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flower Field — Sunny Day</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; height: 100vh; width: 100vw; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+let W = canvas.width, H = canvas.height;
+
+let t = 0;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function hsl(h, s, l, a = 1) {
+  return `hsla(${Math.round(h)},${Math.round(s)}%,${Math.round(l)}%,${a})`;
+}
+
+// Variable wind: calm base with occasional gusts
+function windStrength(t) {
+  const base = 0.55 + 0.25 * Math.sin(t * 0.11 + 0.5);
+  const gust = 0.55 * Math.max(0, Math.sin(t * 0.27 + 0.3)) * Math.max(0, Math.sin(t * 0.08));
+  return base + gust;
+}
+
+// Multi-octave wind for organic turbulence
+function rawWind(x, phase, t, strength = 1) {
+  const w = windStrength(t);
+  return (Math.sin(t * 0.65 + x * 0.003 + phase) * 6
+        + Math.sin(t * 1.35 + x * 0.008 + phase * 1.4) * 2.5
+        + Math.sin(t * 2.8  + x * 0.02  + phase * 0.6) * 0.8) * strength * w;
+}
+
+// ---- Flower drawings ----
+
+function drawHydrangea(x, y, scale, windX, windY, hue) {
+  const cx = x + windX, cy = y + windY;
+  const r = 22 * scale;
+  for (let i = 0; i < 28; i++) {
+    const angle = (i / 28) * Math.PI * 2;
+    const dist = rand(0, r * 0.75);
+    const fx = cx + Math.cos(angle) * dist;
+    const fy = cy + Math.sin(angle) * dist;
+    const floretR = (3.5 + rand(-1, 1)) * scale;
+    ctx.beginPath();
+    for (let p = 0; p < 4; p++) {
+      const pa = (p / 4) * Math.PI * 2;
+      ctx.ellipse(fx + Math.cos(pa) * floretR * 0.7, fy + Math.sin(pa) * floretR * 0.7,
+        floretR * 0.6, floretR * 0.4, pa, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = hsl(hue + rand(-12, 12), 55 + rand(-10, 10), 65 + rand(-10, 10));
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(fx, fy, floretR * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(hue + 20, 40, 85);
+    ctx.fill();
+  }
+}
+
+function drawGerbera(x, y, scale, windX, windY, hue) {
+  const cx = x + windX, cy = y + windY;
+  const petalLen = 20 * scale;
+  const petalW = 5 * scale;
+  const nPetals = 18;
+  for (let i = 0; i < nPetals; i++) {
+    const angle = (i / nPetals) * Math.PI * 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, -petalLen * 0.55, petalW * 0.5, petalLen * 0.55, 0, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(hue + rand(-8, 8), 60, 62 + rand(-8, 8));
+    ctx.fill();
+    ctx.restore();
+  }
+  for (let i = 0; i < nPetals; i++) {
+    const angle = (i / nPetals) * Math.PI * 2 + Math.PI / nPetals;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, -petalLen * 0.35, petalW * 0.35, petalLen * 0.35, 0, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(hue + 15 + rand(-5, 5), 55, 55);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = hsl(hue + 30, 30, 25);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = hsl(hue + 10, 20, 40);
+  ctx.fill();
+}
+
+function drawCarnation(x, y, scale, windX, windY, hue) {
+  const cx = x + windX, cy = y + windY;
+  const layers = 4;
+  for (let l = layers; l >= 0; l--) {
+    const r = (10 + l * 5) * scale;
+    const nPetals = 8 + l * 2;
+    const lightness = 60 + l * 5;
+    for (let i = 0; i < nPetals; i++) {
+      const angle = (i / nPetals) * Math.PI * 2 + l * 0.3;
+      const px = cx + Math.cos(angle) * r * 0.55;
+      const py = cy + Math.sin(angle) * r * 0.55;
+      ctx.beginPath();
+      ctx.ellipse(px, py, r * 0.38, r * 0.55, angle, 0, Math.PI * 2);
+      ctx.fillStyle = hsl(hue + rand(-10, 10), 55, lightness);
+      ctx.fill();
+    }
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = hsl(hue + 20, 40, 80);
+  ctx.fill();
+}
+
+function drawPeony(x, y, scale, windX, windY, hue) {
+  const cx = x + windX, cy = y + windY;
+  const layers = 5;
+  for (let l = layers; l >= 0; l--) {
+    const r = (12 + l * 6) * scale;
+    const nPetals = 6 + l;
+    for (let i = 0; i < nPetals; i++) {
+      const angle = (i / nPetals) * Math.PI * 2 + l * 0.4;
+      const px = cx + Math.cos(angle) * r * 0.45;
+      const py = cy + Math.sin(angle) * r * 0.45;
+      ctx.beginPath();
+      ctx.ellipse(px, py, r * 0.42, r * 0.62, angle + Math.PI / 2, 0, Math.PI * 2);
+      ctx.fillStyle = hsl(hue + rand(-15, 15), 50 + rand(-5, 5), 62 + l * 3 + rand(-5, 5));
+      ctx.fill();
+    }
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = hsl(hue - 10, 35, 85);
+  ctx.fill();
+  for (let s = 0; s < 12; s++) {
+    const a = (s / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * 7 * scale, cy + Math.sin(a) * 7 * scale);
+    ctx.strokeStyle = hsl(hue + 30, 60, 80, 0.7);
+    ctx.lineWidth = 0.8 * scale;
+    ctx.stroke();
+  }
+}
+
+function drawStem(x, yBase, height, windX, windY) {
+  const tipX = x + windX;
+  const tipY = yBase - height + windY;
+  ctx.beginPath();
+  ctx.moveTo(x, yBase);
+  ctx.bezierCurveTo(
+    x + windX * 0.2, yBase - height * 0.4,
+    x + windX * 0.6, yBase - height * 0.7,
+    tipX, tipY
+  );
+  ctx.strokeStyle = hsl(120, 40, 28);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  const lx = lerp(x, tipX, 0.45);
+  const ly = lerp(yBase, tipY, 0.45);
+  ctx.save();
+  ctx.translate(lx, ly);
+  ctx.rotate(windX * 0.04 + 0.4);
+  ctx.beginPath();
+  ctx.ellipse(8, 0, 12, 5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = hsl(115, 45, 32);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGrass(gx, gy, windX, t) {
+  const bladeH = rand(25, 55);
+  const sway = windX * 0.5 + Math.sin(t * 1.1 + gx * 0.1) * 4;
+  ctx.beginPath();
+  ctx.moveTo(gx, gy);
+  ctx.quadraticCurveTo(gx + sway * 0.5, gy - bladeH * 0.6, gx + sway, gy - bladeH);
+  ctx.strokeStyle = hsl(110 + rand(-10, 10), 50 + rand(-10, 10), 30 + rand(-5, 15));
+  ctx.lineWidth = 1.2 + rand(0, 0.8);
+  ctx.stroke();
+}
+
+// ---- Build scene ----
+const flowerTypes = ['hydrangea', 'gerbera', 'carnation', 'peony'];
+const hueRanges = {
+  hydrangea: [235, 255],
+  gerbera: [265, 285],
+  carnation: [200, 300],
+  peony: [265, 305]
+};
+
+let flowers = [];
+let grassBlades = [];
+let clouds = [];
+
+function buildScene() {
+  flowers = [];
+  grassBlades = [];
+  const rows = 8;
+  for (let row = 0; row < rows; row++) {
+    const rowY = H * 0.52 + row * (H * 0.07);
+    const n = 6 + row * 2;
+    for (let i = 0; i < n; i++) {
+      const x = rand(W * 0.01, W * 0.99);
+      const scale = 0.55 + row * 0.07 + rand(-0.05, 0.05);
+      const type = flowerTypes[Math.floor(rand(0, 4))];
+      const [hMin, hMax] = hueRanges[type];
+      const hue = rand(hMin, hMax);
+      const stemH = rand(50, 110) * scale;
+      flowers.push({ x, y: rowY, scale, type, hue, stemH, phase: rand(0, Math.PI * 2), sx: 0, vx: 0 });
+    }
+  }
+  flowers.sort((a, b) => a.y - b.y);
+
+  for (let i = 0; i < 380; i++) {
+    grassBlades.push({ x: rand(0, W), y: rand(H * 0.48, H), phase: rand(0, Math.PI * 2), sx: 0, vx: 0 });
+  }
+
+  clouds = [
+    { x: W * 0.15, y: H * 0.12, s: 1.1, dx: 0.10 },
+    { x: W * 0.45, y: H * 0.08, s: 0.8, dx: 0.07 },
+    { x: W * 0.62, y: H * 0.18, s: 0.7, dx: 0.13 },
+  ];
+}
+buildScene();
+
+function drawFarField() {
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.52);
+  for (let x = 0; x <= W; x += 8) {
+    ctx.lineTo(x, H * 0.52 + Math.sin(x * 0.012) * 18 + Math.sin(x * 0.03) * 8);
+  }
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  const grd = ctx.createLinearGradient(0, H * 0.48, 0, H);
+  grd.addColorStop(0, '#7aaf45');
+  grd.addColorStop(0.3, '#5f9c32');
+  grd.addColorStop(1, '#4a7f25');
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  for (let tx = -20; tx < W + 20; tx += 38) {
+    const th = rand(40, 90);
+    ctx.beginPath();
+    ctx.ellipse(tx, H * 0.47, 18, th * 0.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(115, 38, 28);
+    ctx.fill();
+  }
+}
+
+function drawSky() {
+  const grd = ctx.createLinearGradient(0, 0, 0, H * 0.55);
+  grd.addColorStop(0, '#6ab0e8');
+  grd.addColorStop(0.5, '#a8d4f5');
+  grd.addColorStop(1, '#d4ecff');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H * 0.55);
+
+  const sunX = W * 0.78, sunY = H * 0.12;
+  const sg = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 120);
+  sg.addColorStop(0, 'rgba(255,250,180,0.5)');
+  sg.addColorStop(0.3, 'rgba(255,245,140,0.18)');
+  sg.addColorStop(1, 'rgba(255,245,140,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 120, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 36, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff5aa';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 28, 0, Math.PI * 2);
+  ctx.fillStyle = '#fffde0';
+  ctx.fill();
+
+  clouds.forEach(cl => {
+    ctx.save();
+    ctx.translate(cl.x, cl.y);
+    ctx.scale(cl.s, cl.s);
+    ctx.globalAlpha = 0.82;
+    [[0, 0, 34], [-30, 12, 25], [30, 12, 25], [-16, 16, 20], [16, 16, 20]].forEach(([dx, dy, r]) => {
+      ctx.beginPath();
+      ctx.arc(dx, dy, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  });
+}
+
+function frame() {
+  t += 0.016;
+  ctx.clearRect(0, 0, W, H);
+
+  // Drift clouds across the sky, wrap around
+  clouds.forEach(cl => {
+    cl.x += cl.dx;
+    if (cl.x > W + 120 / cl.s) cl.x = -120 / cl.s;
+  });
+
+  drawSky();
+  drawFarField();
+
+  const gg = ctx.createLinearGradient(0, H * 0.5, 0, H);
+  gg.addColorStop(0, '#6fa83c');
+  gg.addColorStop(0.4, '#5c922e');
+  gg.addColorStop(1, '#3d6b18');
+  ctx.fillStyle = gg;
+  ctx.fillRect(0, H * 0.5, W, H);
+
+  // Spring physics for grass (light, snappy)
+  grassBlades.filter(g => g.y < H * 0.65).forEach(g => {
+    const target = rawWind(g.x, g.phase, t, 0.7);
+    g.vx += (target - g.sx) * 0.10 - g.vx * 0.24;
+    g.sx += g.vx;
+    drawGrass(g.x, g.y, g.sx, t);
+  });
+
+  // Spring physics for flowers (heavier, more lag and overshoot)
+  flowers.forEach(f => {
+    const target = rawWind(f.x, f.phase, t, 1.2);
+    f.vx += (target - f.sx) * 0.055 - f.vx * 0.16;
+    f.sx += f.vx;
+    const wx = f.sx;
+    const wy = Math.abs(wx) * 0.15;
+    const stemBase = f.y + 8;
+    drawStem(f.x, stemBase, f.stemH, wx, -wy);
+    const fx = f.x + wx;
+    const fy = stemBase - f.stemH - wy;
+    if (f.type === 'hydrangea') drawHydrangea(fx, fy, f.scale, 0, 0, f.hue);
+    else if (f.type === 'gerbera') drawGerbera(fx, fy, f.scale, 0, 0, f.hue);
+    else if (f.type === 'carnation') drawCarnation(fx, fy, f.scale, 0, 0, f.hue);
+    else drawPeony(fx, fy, f.scale, 0, 0, f.hue);
+  });
+
+  grassBlades.filter(g => g.y >= H * 0.65).forEach(g => {
+    const target = rawWind(g.x, g.phase, t, 0.9);
+    g.vx += (target - g.sx) * 0.10 - g.vx * 0.24;
+    g.sx += g.vx;
+    drawGrass(g.x, g.y, g.sx, t);
+  });
+
+  const haze = ctx.createRadialGradient(W * 0.78, 0, 0, W * 0.78, 0, W * 0.7);
+  haze.addColorStop(0, 'rgba(255,250,200,0.10)');
+  haze.addColorStop(1, 'rgba(255,250,200,0)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 0, W, H);
+
+  requestAnimationFrame(frame);
+}
+
+frame();
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  W = canvas.width;
+  H = canvas.height;
+  buildScene();
+});
+</script>
+</body>
+</html>
